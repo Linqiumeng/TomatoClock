@@ -36,9 +36,19 @@ function App() {
     if (!audioContextInitialized) {
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        audioContext.resume()
-        setAudioContextInitialized(true)
-        console.log('Audio context initialized')
+        
+        // iOS requires user interaction to start audio context
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            setAudioContextInitialized(true)
+            console.log('Audio context initialized and resumed')
+          }).catch(error => {
+            console.log('Failed to resume audio context:', error)
+          })
+        } else {
+          setAudioContextInitialized(true)
+          console.log('Audio context initialized')
+        }
       } catch (error) {
         console.log('Failed to initialize audio context:', error)
       }
@@ -683,6 +693,12 @@ function App() {
                 onClick={() => {
                   initializeAudioContext()
                   testAudio()
+                }}
+                onTouchStart={() => {
+                  // iOS touch event to ensure audio context can be initialized
+                  if (!audioContextInitialized) {
+                    initializeAudioContext()
+                  }
                 }}
               >
                 {isTestPlaying ? '⏹️ Stop Audio' : '🔊 Test Audio'}

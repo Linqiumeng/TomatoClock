@@ -774,6 +774,60 @@ body {
   }
 }
 
+/* Extra small screens and very tall phones */
+@media (max-width: 320px) {
+  .container {
+    padding: 8px;
+  }
+  
+  .title {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+  }
+  
+  .timer-circle {
+    width: 160px;
+    height: 160px;
+    transform: scale(0.7);
+  }
+  
+  .progress-ring {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .progress-ring circle {
+    r: 70;
+    cx: 80;
+    cy: 80;
+    stroke-width: 5;
+  }
+  
+  .time {
+    font-size: 1.8rem;
+  }
+  
+  .status {
+    font-size: 0.7rem;
+  }
+  
+  .controls {
+    gap: 8px;
+  }
+  
+  .btn {
+    width: 140px;
+    padding: 8px 12px;
+    font-size: 0.7rem;
+  }
+  
+  .mode {
+    width: 80px;
+    font-size: 0.65rem;
+    padding: 4px 8px;
+  }
+}
+
 /* Landscape orientation for mobile */
 @media (max-width: 768px) and (orientation: landscape) {
   .app {
@@ -883,5 +937,119 @@ body {
   
   .info li {
     color: #ccc;
+  }
+}
+
+/* iOS Specific Fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  .btn {
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  .btn:active {
+    -webkit-transform: scale(0.98);
+    transform: scale(0.98);
+  }
+  
+  input[type="range"] {
+    -webkit-appearance: none;
+    background: transparent;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #FF6B6B;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: none;
+  }
+  
+  input[type="range"]::-webkit-slider-track {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #e0e0e0;
+  }
+  
+  /* Fix for iOS audio context issues */
+  .timer-container {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Prevent text selection on buttons */
+  .btn, .mode {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Fix for iOS safe areas */
+  .app {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* iPhone 15 Pro and modern phones specific fixes */
+@media screen and (max-width: 430px) and (min-height: 800px) {
+  .container {
+    padding: 20px;
+  }
+  
+  .timer-circle {
+    width: 220px;
+    height: 220px;
+  }
+  
+  .progress-ring {
+    width: 220px;
+    height: 220px;
+  }
+  
+  .progress-ring circle {
+    r: 100;
+    cx: 110;
+    cy: 110;
+  }
+  
+  .time {
+    font-size: 2.8rem;
+  }
+  
+  .title {
+    font-size: 1.8rem;
+  }
+  
+  .controls {
+    gap: 12px;
+  }
+  
+  .btn {
+    width: 180px;
+    padding: 12px 20px;
+  }
+}
+
+/* Fix for iOS audio autoplay restrictions */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  .btn-test-audio {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
   }
 }
