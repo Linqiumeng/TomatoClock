@@ -450,59 +450,379 @@ body {
 }
 
 /* Responsive Design */
+@media (max-width: 1200px) {
+  .app {
+    max-width: 90%;
+  }
+  
+  .container {
+    padding: 30px;
+  }
+}
+
 @media (max-width: 768px) {
   .app {
     padding: 10px;
+    max-width: 95%;
   }
   
   .container {
     padding: 20px;
+    border-radius: 15px;
   }
   
   .title {
     font-size: 2rem;
+    margin-bottom: 20px;
+  }
+  
+  .mode-indicator {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .mode {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+  
+  .timer-container {
+    margin: 30px 0;
+  }
+  
+  .timer-circle {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .progress-ring {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .progress-ring circle {
+    r: 115;
+    cx: 125;
+    cy: 125;
+    stroke-width: 10;
   }
   
   .time {
     font-size: 3rem;
   }
   
+  .status {
+    font-size: 1rem;
+  }
+  
   .controls {
     flex-direction: column;
     align-items: center;
+    gap: 10px;
+    margin: 30px 0;
   }
   
   .btn {
     width: 200px;
+    padding: 10px 20px;
+    font-size: 0.9rem;
   }
   
   .stats {
     flex-direction: column;
     align-items: center;
+    gap: 15px;
+    margin: 20px 0;
   }
   
   .stat {
     width: 100%;
     max-width: 200px;
+    padding: 12px;
+  }
+  
+  .info {
+    margin-top: 30px;
+    padding: 15px;
+  }
+  
+  .info h3 {
+    font-size: 1.1rem;
+  }
+  
+  .info li {
+    font-size: 0.9rem;
+    padding: 6px 0;
+  }
+  
+  .notification-section {
+    margin-top: 15px;
+    padding-top: 15px;
+  }
+  
+  .audio-settings {
+    margin-top: 15px;
+    padding-top: 15px;
+  }
+  
+  .audio-type-selector {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .audio-type-selector label {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .setting-group {
+    margin-bottom: 12px;
+  }
+  
+  .setting-group label {
+    font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
+  .app {
+    padding: 5px;
+    max-width: 100%;
+  }
+  
+  .container {
+    padding: 15px;
+    border-radius: 10px;
+  }
+  
+  .title {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+  }
+  
+  .mode-indicator {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .mode {
+    width: 120px;
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+  
   .timer-circle {
-    transform: scale(0.8);
+    width: 200px;
+    height: 200px;
+    transform: scale(0.9);
+  }
+  
+  .progress-ring {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .progress-ring circle {
+    r: 90;
+    cx: 100;
+    cy: 100;
+    stroke-width: 8;
   }
   
   .time {
     font-size: 2.5rem;
   }
   
-  .mode-indicator {
-    flex-direction: column;
-    align-items: center;
+  .status {
+    font-size: 0.9rem;
+  }
+  
+  .controls {
+    gap: 8px;
+    margin: 20px 0;
+  }
+  
+  .btn {
+    width: 180px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+  
+  .stats {
+    gap: 10px;
+    margin: 15px 0;
+  }
+  
+  .stat {
+    max-width: 180px;
+    padding: 10px;
+  }
+  
+  .stat-label {
+    font-size: 0.8rem;
+  }
+  
+  .stat-value {
+    font-size: 1.3rem;
+  }
+  
+  .info {
+    margin-top: 20px;
+    padding: 12px;
+  }
+  
+  .info h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+  
+  .info li {
+    font-size: 0.8rem;
+    padding: 5px 0;
+    padding-left: 20px;
+  }
+  
+  .info li::before {
+    top: 5px;
+    font-size: 0.8rem;
+  }
+  
+  .notification-section h4 {
+    font-size: 1rem;
+  }
+  
+  .notification-section p {
+    font-size: 0.85rem;
+  }
+  
+  .audio-settings h5 {
+    font-size: 0.9rem;
+  }
+  
+  .setting-group label {
+    font-size: 0.8rem;
+  }
+  
+  .btn-upload {
+    padding: 8px 16px;
+    font-size: 0.8rem;
+  }
+  
+  .audio-info {
+    padding: 8px;
+  }
+  
+  .audio-info p {
+    font-size: 0.85rem;
+  }
+  
+  .audio-file-name {
+    font-size: 0.8rem;
+  }
+  
+  .btn-clear-audio {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .container {
+    padding: 10px;
+  }
+  
+  .title {
+    font-size: 1.5rem;
+  }
+  
+  .timer-circle {
+    width: 180px;
+    height: 180px;
+    transform: scale(0.8);
+  }
+  
+  .progress-ring {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .progress-ring circle {
+    r: 80;
+    cx: 90;
+    cy: 90;
+    stroke-width: 6;
+  }
+  
+  .time {
+    font-size: 2rem;
+  }
+  
+  .status {
+    font-size: 0.8rem;
+  }
+  
+  .btn {
+    width: 160px;
+    font-size: 0.75rem;
   }
   
   .mode {
-    width: 150px;
+    width: 100px;
+    font-size: 0.7rem;
+  }
+}
+
+/* Landscape orientation for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .app {
+    padding: 5px;
+  }
+  
+  .container {
+    padding: 15px;
+  }
+  
+  .timer-circle {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .progress-ring {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .progress-ring circle {
+    r: 80;
+    cx: 90;
+    cy: 90;
+  }
+  
+  .time {
+    font-size: 2.2rem;
+  }
+  
+  .controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .btn {
+    width: 120px;
+    font-size: 0.8rem;
+  }
+  
+  .stats {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .stat {
+    max-width: 150px;
   }
 }
 
