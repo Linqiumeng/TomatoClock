@@ -19,6 +19,7 @@ function App() {
   const [audioFileName, setAudioFileName] = useState('')
   const [isTestPlaying, setIsTestPlaying] = useState(false)
   const [testAudioContext, setTestAudioContext] = useState(null)
+  const [audioContextInitialized, setAudioContextInitialized] = useState(false)
   const intervalRef = useRef(null)
 
   const workTime = 25 * 60 // 25 minutes
@@ -29,6 +30,20 @@ function App() {
   useEffect(() => {
     loadAudioFromStorage()
   }, [])
+
+  // Initialize audio context on first user interaction
+  const initializeAudioContext = () => {
+    if (!audioContextInitialized) {
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        audioContext.resume()
+        setAudioContextInitialized(true)
+        console.log('Audio context initialized')
+      } catch (error) {
+        console.log('Failed to initialize audio context:', error)
+      }
+    }
+  }
 
   useEffect(() => {
     if (isRunning) {
@@ -88,41 +103,26 @@ function App() {
       })
     }
 
-    // Method 2: Audio notification (enhanced)
-    try {
-      if (audioType === 'custom' && customAudio) {
-        // Play custom uploaded audio
-        customAudio.volume = audioSettings.volume
-        customAudio.currentTime = 0
-        customAudio.play()
-      } else {
-        // Play synthesized beeps
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        
-        // Play multiple beeps for better attention
-        for (let i = 0; i < audioSettings.beepCount; i++) {
-          setTimeout(() => {
-            const oscillator = audioContext.createOscillator()
-            const gainNode = audioContext.createGain()
-            
-            oscillator.connect(gainNode)
-            gainNode.connect(audioContext.destination)
-            
-            oscillator.frequency.setValueAtTime(audioSettings.frequency, audioContext.currentTime)
-            oscillator.frequency.setValueAtTime(audioSettings.frequency * 0.75, audioContext.currentTime + 0.1)
-            oscillator.frequency.setValueAtTime(audioSettings.frequency, audioContext.currentTime + 0.2)
-            
-            gainNode.gain.setValueAtTime(audioSettings.volume, audioContext.currentTime)
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + audioSettings.duration)
-            
-            oscillator.start(audioContext.currentTime)
-            oscillator.stop(audioContext.currentTime + audioSettings.duration)
-          }, i * audioSettings.beepGap)
+    // Method 2: Audio notification (enhanced with fallbacks)
+    const playAudio = async () => {
+      try {
+        if (audioType === 'custom' && customAudio) {
+          // Play custom uploaded audio
+          customAudio.volume = audioSettings.volume
+          customAudio.currentTime = 0
+          await customAudio.play()
+        } else {
+          // Play synthesized beeps with fallback
+          await playSynthesizedAudio()
         }
+      } catch (error) {
+        console.log('Audio failed, trying fallback:', error)
+        // Fallback: Try to play a simple beep using HTML5 Audio
+        playFallbackAudio()
       }
-    } catch (error) {
-      console.log('Audio notification failed:', error)
     }
+
+    playAudio()
 
     // Method 3: Visual notification (page title flash)
     let flashCount = 0
@@ -142,7 +142,70 @@ function App() {
     }
   }
 
-  const testAudio = () => {
+  const playSynthesizedAudio = async () => {
+    try {
+      // Initialize audio context if needed
+      if (!audioContextInitialized) {
+        initializeAudioContext()
+      }
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      
+      // Resume audio context (required for some browsers)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+      
+      // Play multiple beeps for better attention
+      for (let i = 0; i < audioSettings.beepCount; i++) {
+        setTimeout(() => {
+          try {
+            const oscillator = audioContext.createOscillator()
+            const gainNode = audioContext.createGain()
+            
+            oscillator.connect(gainNode)
+            gainNode.connect(audioContext.destination)
+            
+            oscillator.frequency.setValueAtTime(audioSettings.frequency, audioContext.currentTime)
+            oscillator.frequency.setValueAtTime(audioSettings.frequency * 0.75, audioContext.currentTime + 0.1)
+            oscillator.frequency.setValueAtTime(audioSettings.frequency, audioContext.currentTime + 0.2)
+            
+            gainNode.gain.setValueAtTime(audioSettings.volume, audioContext.currentTime)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + audioSettings.duration)
+            
+            oscillator.start(audioContext.currentTime)
+            oscillator.stop(audioContext.currentTime + audioSettings.duration)
+          } catch (error) {
+            console.log('Oscillator failed:', error)
+          }
+        }, i * audioSettings.beepGap)
+      }
+    } catch (error) {
+      console.log('Synthesized audio failed:', error)
+      throw error // Re-throw to trigger fallback
+    }
+  }
+
+  const playFallbackAudio = () => {
+    try {
+      // Create a simple beep using HTML5 Audio with data URL
+      const beepData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
+      const audio = new Audio(beepData)
+      audio.volume = audioSettings.volume
+      
+      // Play multiple beeps
+      for (let i = 0; i < audioSettings.beepCount; i++) {
+        setTimeout(() => {
+          audio.currentTime = 0
+          audio.play().catch(e => console.log('Fallback audio failed:', e))
+        }, i * audioSettings.beepGap)
+      }
+    } catch (error) {
+      console.log('Fallback audio failed:', error)
+    }
+  }
+
+  const testAudio = async () => {
     if (isTestPlaying) {
       // Stop test audio
       if (testAudioContext) {
@@ -165,22 +228,44 @@ function App() {
         // Test custom uploaded audio
         customAudio.volume = audioSettings.volume
         customAudio.currentTime = 0
-        customAudio.play()
+        await customAudio.play()
         
         // Auto-stop after audio ends
         customAudio.onended = () => {
           setIsTestPlaying(false)
         }
       } else {
-        // Test synthesized beeps
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        setTestAudioContext(audioContext)
-        
-        // Play multiple beeps for testing
-        for (let i = 0; i < audioSettings.beepCount; i++) {
-          setTimeout(() => {
-            if (!isTestPlaying) return // Stop if user clicked stop
-            
+        // Test synthesized beeps with fallback
+        await testSynthesizedAudio()
+      }
+    } catch (error) {
+      console.log('Test audio failed, trying fallback:', error)
+      // Try fallback audio
+      testFallbackAudio()
+    }
+  }
+
+  const testSynthesizedAudio = async () => {
+    try {
+      // Initialize audio context if needed
+      if (!audioContextInitialized) {
+        initializeAudioContext()
+      }
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      setTestAudioContext(audioContext)
+      
+      // Resume audio context (required for some browsers)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+      
+      // Play multiple beeps for testing
+      for (let i = 0; i < audioSettings.beepCount; i++) {
+        setTimeout(() => {
+          if (!isTestPlaying) return // Stop if user clicked stop
+          
+          try {
             const oscillator = audioContext.createOscillator()
             const gainNode = audioContext.createGain()
             
@@ -196,17 +281,45 @@ function App() {
             
             oscillator.start(audioContext.currentTime)
             oscillator.stop(audioContext.currentTime + audioSettings.duration)
-          }, i * audioSettings.beepGap)
-        }
-        
-        // Auto-stop after all beeps
-        setTimeout(() => {
-          setIsTestPlaying(false)
-          setTestAudioContext(null)
-        }, (audioSettings.beepCount * audioSettings.beepGap) + (audioSettings.duration * 1000))
+          } catch (error) {
+            console.log('Test oscillator failed:', error)
+          }
+        }, i * audioSettings.beepGap)
       }
+      
+      // Auto-stop after all beeps
+      setTimeout(() => {
+        setIsTestPlaying(false)
+        setTestAudioContext(null)
+      }, (audioSettings.beepCount * audioSettings.beepGap) + (audioSettings.duration * 1000))
     } catch (error) {
-      console.log('Test audio failed:', error)
+      console.log('Test synthesized audio failed:', error)
+      throw error // Re-throw to trigger fallback
+    }
+  }
+
+  const testFallbackAudio = () => {
+    try {
+      // Create a simple beep using HTML5 Audio with data URL
+      const beepData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
+      const audio = new Audio(beepData)
+      audio.volume = audioSettings.volume
+      
+      // Play multiple beeps
+      for (let i = 0; i < audioSettings.beepCount; i++) {
+        setTimeout(() => {
+          if (!isTestPlaying) return // Stop if user clicked stop
+          audio.currentTime = 0
+          audio.play().catch(e => console.log('Test fallback audio failed:', e))
+        }, i * audioSettings.beepGap)
+      }
+      
+      // Auto-stop after all beeps
+      setTimeout(() => {
+        setIsTestPlaying(false)
+      }, (audioSettings.beepCount * audioSettings.beepGap) + 1000)
+    } catch (error) {
+      console.log('Test fallback audio failed:', error)
       setIsTestPlaying(false)
     }
   }
@@ -567,7 +680,10 @@ function App() {
 
               <button 
                 className={`btn ${isTestPlaying ? 'btn-stop-audio' : 'btn-test-audio'}`}
-                onClick={testAudio}
+                onClick={() => {
+                  initializeAudioContext()
+                  testAudio()
+                }}
               >
                 {isTestPlaying ? '⏹️ Stop Audio' : '🔊 Test Audio'}
               </button>
