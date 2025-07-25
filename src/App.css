@@ -11,12 +11,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }
 
 .app {
   width: 100%;
   max-width: 600px;
   padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .container {
@@ -26,6 +33,9 @@ body {
   padding: 40px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   text-align: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .title {
@@ -462,13 +472,17 @@ body {
 
 @media (max-width: 768px) {
   .app {
-    padding: 10px;
-    max-width: 95%;
+    padding: 5px;
+    max-width: 100%;
+    min-height: 100vh;
   }
   
   .container {
-    padding: 20px;
+    padding: 15px;
     border-radius: 15px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
   }
   
   .title {
@@ -586,13 +600,17 @@ body {
 
 @media (max-width: 480px) {
   .app {
-    padding: 5px;
+    padding: 2px;
     max-width: 100%;
+    min-height: 100vh;
   }
   
   .container {
-    padding: 15px;
+    padding: 10px;
     border-radius: 10px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
   }
   
   .title {
@@ -729,8 +747,18 @@ body {
 }
 
 @media (max-width: 360px) {
+  .app {
+    padding: 0;
+    max-width: 100%;
+    min-height: 100vh;
+  }
+  
   .container {
-    padding: 10px;
+    padding: 5px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
   }
   
   .title {
@@ -776,8 +804,18 @@ body {
 
 /* Extra small screens and very tall phones */
 @media (max-width: 320px) {
+  .app {
+    padding: 0;
+    max-width: 100%;
+    min-height: 100vh;
+  }
+  
   .container {
-    padding: 8px;
+    padding: 3px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
   }
   
   .title {
@@ -1010,13 +1048,17 @@ body {
 /* iPhone 15 Pro and modern phones specific fixes - HIGH PRIORITY */
 @media screen and (max-width: 430px) and (min-height: 800px) {
   .app {
-    padding: 10px !important;
-    max-width: 95% !important;
+    padding: 2px !important;
+    max-width: 100% !important;
+    min-height: 100vh !important;
   }
   
   .container {
-    padding: 20px !important;
+    padding: 12px !important;
     border-radius: 15px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
   }
   
   .title {
@@ -1114,11 +1156,17 @@ body {
 /* iPhone 15 Pro exact dimensions - ULTRA SPECIFIC */
 @media screen and (width: 393px) and (height: 852px) {
   .app {
-    padding: 8px !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    min-height: 100vh !important;
   }
   
   .container {
-    padding: 18px !important;
+    padding: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
   }
   
   .timer-circle {
