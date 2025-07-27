@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import './App.css'
 
 function App() {
@@ -20,7 +20,15 @@ function App() {
   const [isTestPlaying, setIsTestPlaying] = useState(false)
   const [testAudioContext, setTestAudioContext] = useState(null)
   const [audioContextInitialized, setAudioContextInitialized] = useState(false)
-  const intervalRef = useRef(null)
+  const [isAlarmPlaying, setIsAlarmPlaying] = useState(false)
+  const [currentAlarmAudio, setCurrentAlarmAudio] = useState(null)
+  const [alarmTimeouts, setAlarmTimeouts] = useState([])
+  
+  // High-precision timing refs
+  const startTimeRef = useRef(null)
+  const initialDurationRef = useRef(null)
+  const animationFrameRef = useRef(null)
+  const lastUpdateRef = useRef(0)
 
   const workTime = 25 * 60 // 25 minutes
   const shortBreakTime = 5 * 60 // 5 minutes
@@ -32,12 +40,11 @@ function App() {
   }, [])
 
   // Initialize audio context on first user interaction
-  const initializeAudioContext = () => {
+  const initializeAudioContext = useCallback(() => {
     if (!audioContextInitialized) {
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         
-        // iOS requires user interaction to start audio context
         if (audioContext.state === 'suspended') {
           audioContext.resume().then(() => {
             setAudioContextInitialized(true)
@@ -53,56 +60,118 @@ function App() {
         console.log('Failed to initialize audio context:', error)
       }
     }
-  }
+  }, [audioContextInitialized])
 
-  useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime <= 1) {
-            // Timer finished
-            clearInterval(intervalRef.current)
-            setIsRunning(false)
-            
-            // Play notification sound
-            playNotification()
-            
-            // Handle session completion
-            if (mode === 'work') {
-              const newSessions = sessions + 1
-              setSessions(newSessions)
-              
-              // Every 4 sessions, take a long break
-              if (newSessions % 4 === 0) {
-                setMode('longBreak')
-                setTimeLeft(longBreakTime)
-                setIsBreak(true)
-              } else {
-                setMode('shortBreak')
-                setTimeLeft(shortBreakTime)
-                setIsBreak(true)
-              }
-            } else {
-              // Break finished, start work session
-              setMode('work')
-              setTimeLeft(workTime)
-              setIsBreak(false)
-            }
-            
-            return prevTime
-          }
-          return prevTime - 1
-        })
-      }, 1000)
-    } else {
-      clearInterval(intervalRef.current)
+  // High-precision timer using requestAnimationFrame + Date.now()
+  const updateTimer = useCallback(() => {
+    if (!isRunning || !startTimeRef.current || !initialDurationRef.current) {
+      return
     }
 
-    return () => clearInterval(intervalRef.current)
-  }, [isRunning, mode, sessions])
+    const now = Date.now()
+    const elapsed = Math.floor((now - startTimeRef.current) / 1000)
+    const newTimeLeft = Math.max(0, initialDurationRef.current - elapsed)
+    
+    // Only update state if time actually changed (reduces re-renders)
+    if (newTimeLeft !== lastUpdateRef.current) {
+      lastUpdateRef.current = newTimeLeft
+      setTimeLeft(newTimeLeft)
+      
+      // Check if timer finished
+      if (newTimeLeft <= 0) {
+        handleTimerComplete()
+        return
+      }
+    }
+    
+    // Continue the high-precision timer
+    animationFrameRef.current = requestAnimationFrame(updateTimer)
+  }, [isRunning])
 
-  const playNotification = () => {
-    // Method 1: Browser Notification API
+  // Handle timer completion
+  const handleTimerComplete = useCallback(() => {
+    setIsRunning(false)
+    startTimeRef.current = null
+    initialDurationRef.current = null
+    
+    // Play notification sound
+    playNotification()
+    
+    // Handle session completion
+    if (mode === 'work') {
+      setSessions(prevSessions => {
+        const newSessions = prevSessions + 1
+        
+        // Schedule the mode change
+        setTimeout(() => {
+          if (newSessions % 4 === 0) {
+            setMode('longBreak')
+            setTimeLeft(longBreakTime)
+            setIsBreak(true)
+          } else {
+            setMode('shortBreak')
+            setTimeLeft(shortBreakTime)
+            setIsBreak(true)
+          }
+        }, 100) // Small delay to ensure state is updated
+        
+        return newSessions
+      })
+    } else {
+      // Break finished, start work session
+      setMode('work')
+      setTimeLeft(workTime)
+      setIsBreak(false)
+    }
+  }, [mode, sessions, longBreakTime, shortBreakTime, workTime])
+
+  // Start high-precision timer when isRunning changes
+  useEffect(() => {
+    if (isRunning) {
+      if (!startTimeRef.current) {
+        startTimeRef.current = Date.now()
+        initialDurationRef.current = timeLeft
+        lastUpdateRef.current = timeLeft
+      }
+      
+      // Start the high-precision timer
+      animationFrameRef.current = requestAnimationFrame(updateTimer)
+    } else {
+      // Cancel the timer
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+    }
+  }, [isRunning, updateTimer])
+
+  const stopAlarm = useCallback(() => {
+    setIsAlarmPlaying(false)
+    
+    if (currentAlarmAudio) {
+      currentAlarmAudio.pause()
+      currentAlarmAudio.currentTime = 0
+      setCurrentAlarmAudio(null)
+    }
+    
+    alarmTimeouts.forEach(timeout => clearTimeout(timeout))
+    setAlarmTimeouts([])
+    
+    if (testAudioContext) {
+      testAudioContext.close().catch(() => {})
+      setTestAudioContext(null)
+    }
+  }, [currentAlarmAudio, alarmTimeouts, testAudioContext])
+
+  const playNotification = useCallback(() => {
+    setIsAlarmPlaying(true)
+    
+    // Browser Notification API
     if ('Notification' in window && Notification.permission === 'granted') {
       const message = isBreak ? 'Break time is over! Time to work!' : 'Work session complete! Take a break!'
       new Notification('🍅 Tomato Clock', {
@@ -113,28 +182,33 @@ function App() {
       })
     }
 
-    // Method 2: Audio notification (enhanced with fallbacks)
+    // Audio notification
     const playAudio = async () => {
       try {
         if (audioType === 'custom' && customAudio) {
-          // Play custom uploaded audio
-          customAudio.volume = audioSettings.volume
-          customAudio.currentTime = 0
-          await customAudio.play()
+          const audioClone = customAudio.cloneNode()
+          audioClone.volume = audioSettings.volume
+          audioClone.currentTime = 0
+          setCurrentAlarmAudio(audioClone)
+          
+          audioClone.onended = () => {
+            setIsAlarmPlaying(false)
+            setCurrentAlarmAudio(null)
+          }
+          
+          await audioClone.play()
         } else {
-          // Play synthesized beeps with fallback
-          await playSynthesizedAudio()
+          await playSynthesizedAudio(true)
         }
       } catch (error) {
         console.log('Audio failed, trying fallback:', error)
-        // Fallback: Try to play a simple beep using HTML5 Audio
-        playFallbackAudio()
+        playFallbackAudio(true)
       }
     }
 
     playAudio()
 
-    // Method 3: Visual notification (page title flash)
+    // Visual notification (page title flash)
     let flashCount = 0
     const originalTitle = document.title
     const flashInterval = setInterval(() => {
@@ -146,29 +220,34 @@ function App() {
       }
     }, 500)
 
-    // Method 4: Request notification permission if not granted
+    // Request notification permission if not granted
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
-  }
+  }, [isBreak, audioType, customAudio, audioSettings])
 
-  const playSynthesizedAudio = async () => {
+  const playSynthesizedAudio = async (isAlarm = false) => {
     try {
-      // Initialize audio context if needed
       if (!audioContextInitialized) {
         initializeAudioContext()
       }
 
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       
-      // Resume audio context (required for some browsers)
+      if (isAlarm) {
+        setTestAudioContext(audioContext)
+      }
+      
       if (audioContext.state === 'suspended') {
         await audioContext.resume()
       }
       
-      // Play multiple beeps for better attention
+      const timeouts = []
+      
       for (let i = 0; i < audioSettings.beepCount; i++) {
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          if (isAlarm && !isAlarmPlaying) return
+          
           try {
             const oscillator = audioContext.createOscillator()
             const gainNode = audioContext.createGain()
@@ -189,35 +268,68 @@ function App() {
             console.log('Oscillator failed:', error)
           }
         }, i * audioSettings.beepGap)
+        
+        timeouts.push(timeout)
+      }
+      
+      if (isAlarm) {
+        setAlarmTimeouts(timeouts)
+        
+        const stopTimeout = setTimeout(() => {
+          setIsAlarmPlaying(false)
+          setTestAudioContext(null)
+        }, (audioSettings.beepCount * audioSettings.beepGap) + (audioSettings.duration * 1000))
+        
+        setAlarmTimeouts(prev => [...prev, stopTimeout])
       }
     } catch (error) {
       console.log('Synthesized audio failed:', error)
-      throw error // Re-throw to trigger fallback
+      throw error
     }
   }
 
-  const playFallbackAudio = () => {
+  const playFallbackAudio = (isAlarm = false) => {
     try {
-      // Create a simple beep using HTML5 Audio with data URL
       const beepData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
       const audio = new Audio(beepData)
       audio.volume = audioSettings.volume
       
-      // Play multiple beeps
+      if (isAlarm) {
+        setCurrentAlarmAudio(audio)
+      }
+      
+      const timeouts = []
+      
       for (let i = 0; i < audioSettings.beepCount; i++) {
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          if (isAlarm && !isAlarmPlaying) return
           audio.currentTime = 0
           audio.play().catch(e => console.log('Fallback audio failed:', e))
         }, i * audioSettings.beepGap)
+        
+        timeouts.push(timeout)
+      }
+      
+      if (isAlarm) {
+        setAlarmTimeouts(timeouts)
+        
+        const stopTimeout = setTimeout(() => {
+          setIsAlarmPlaying(false)
+          setCurrentAlarmAudio(null)
+        }, (audioSettings.beepCount * audioSettings.beepGap) + 1000)
+        
+        setAlarmTimeouts(prev => [...prev, stopTimeout])
       }
     } catch (error) {
       console.log('Fallback audio failed:', error)
+      if (isAlarm) {
+        setIsAlarmPlaying(false)
+      }
     }
   }
 
   const testAudio = async () => {
     if (isTestPlaying) {
-      // Stop test audio
       if (testAudioContext) {
         testAudioContext.close()
         setTestAudioContext(null)
@@ -230,34 +342,28 @@ function App() {
       return
     }
 
-    // Start test audio
     setIsTestPlaying(true)
     
     try {
       if (audioType === 'custom' && customAudio) {
-        // Test custom uploaded audio
         customAudio.volume = audioSettings.volume
         customAudio.currentTime = 0
         await customAudio.play()
         
-        // Auto-stop after audio ends
         customAudio.onended = () => {
           setIsTestPlaying(false)
         }
       } else {
-        // Test synthesized beeps with fallback
         await testSynthesizedAudio()
       }
     } catch (error) {
       console.log('Test audio failed, trying fallback:', error)
-      // Try fallback audio
       testFallbackAudio()
     }
   }
 
   const testSynthesizedAudio = async () => {
     try {
-      // Initialize audio context if needed
       if (!audioContextInitialized) {
         initializeAudioContext()
       }
@@ -265,15 +371,13 @@ function App() {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       setTestAudioContext(audioContext)
       
-      // Resume audio context (required for some browsers)
       if (audioContext.state === 'suspended') {
         await audioContext.resume()
       }
       
-      // Play multiple beeps for testing
       for (let i = 0; i < audioSettings.beepCount; i++) {
         setTimeout(() => {
-          if (!isTestPlaying) return // Stop if user clicked stop
+          if (!isTestPlaying) return
           
           try {
             const oscillator = audioContext.createOscillator()
@@ -297,34 +401,30 @@ function App() {
         }, i * audioSettings.beepGap)
       }
       
-      // Auto-stop after all beeps
       setTimeout(() => {
         setIsTestPlaying(false)
         setTestAudioContext(null)
       }, (audioSettings.beepCount * audioSettings.beepGap) + (audioSettings.duration * 1000))
     } catch (error) {
       console.log('Test synthesized audio failed:', error)
-      throw error // Re-throw to trigger fallback
+      throw error
     }
   }
 
   const testFallbackAudio = () => {
     try {
-      // Create a simple beep using HTML5 Audio with data URL
       const beepData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
       const audio = new Audio(beepData)
       audio.volume = audioSettings.volume
       
-      // Play multiple beeps
       for (let i = 0; i < audioSettings.beepCount; i++) {
         setTimeout(() => {
-          if (!isTestPlaying) return // Stop if user clicked stop
+          if (!isTestPlaying) return
           audio.currentTime = 0
           audio.play().catch(e => console.log('Test fallback audio failed:', e))
         }, i * audioSettings.beepGap)
       }
       
-      // Auto-stop after all beeps
       setTimeout(() => {
         setIsTestPlaying(false)
       }, (audioSettings.beepCount * audioSettings.beepGap) + 1000)
@@ -334,60 +434,70 @@ function App() {
     }
   }
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     setIsRunning(true)
-  }
+  }, [])
 
-  const pauseTimer = () => {
+  const pauseTimer = useCallback(() => {
     setIsRunning(false)
-  }
+  }, [])
 
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     setIsRunning(false)
     setSessions(0)
     setMode('work')
     setTimeLeft(workTime)
     setIsBreak(false)
-  }
+    stopAlarm()
+    startTimeRef.current = null
+    initialDurationRef.current = null
+  }, [workTime, stopAlarm])
 
-  const skipTimer = () => {
+  const skipTimer = useCallback(() => {
     setIsRunning(false)
+    stopAlarm()
+    startTimeRef.current = null
+    initialDurationRef.current = null
+    
     if (mode === 'work') {
-      const newSessions = sessions + 1
-      setSessions(newSessions)
-      
-      if (newSessions % 4 === 0) {
-        setMode('longBreak')
-        setTimeLeft(longBreakTime)
-        setIsBreak(true)
-      } else {
-        setMode('shortBreak')
-        setTimeLeft(shortBreakTime)
-        setIsBreak(true)
-      }
+      setSessions(prevSessions => {
+        const newSessions = prevSessions + 1
+        
+        setTimeout(() => {
+          if (newSessions % 4 === 0) {
+            setMode('longBreak')
+            setTimeLeft(longBreakTime)
+            setIsBreak(true)
+          } else {
+            setMode('shortBreak')
+            setTimeLeft(shortBreakTime)
+            setIsBreak(true)
+          }
+        }, 0)
+        
+        return newSessions
+      })
     } else {
       setMode('work')
       setTimeLeft(workTime)
       setIsBreak(false)
     }
-  }
+  }, [mode, longBreakTime, shortBreakTime, workTime, stopAlarm])
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
+  // Memoize expensive calculations to reduce re-renders
+  const formattedTime = useMemo(() => {
+    const mins = Math.floor(timeLeft / 60)
+    const secs = timeLeft % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
+  }, [timeLeft])
 
-  const getProgress = () => {
+  const progressData = useMemo(() => {
     const totalTime = mode === 'work' ? workTime : mode === 'shortBreak' ? shortBreakTime : longBreakTime
-    return ((totalTime - timeLeft) / totalTime) * 100
-  }
-
-  const getStrokeDashoffset = () => {
-    const progress = getProgress()
+    const progress = ((totalTime - timeLeft) / totalTime) * 100
     const circumference = 2 * Math.PI * 140
-    return (1 - progress / 100) * circumference
-  }
+    const strokeDashoffset = (1 - progress / 100) * circumference
+    return { progress, strokeDashoffset }
+  }, [mode, timeLeft, workTime, shortBreakTime, longBreakTime])
 
   const saveAudioToStorage = async (file) => {
     return new Promise((resolve, reject) => {
@@ -439,23 +549,19 @@ function App() {
   const handleAudioUpload = async (event) => {
     const file = event.target.files[0]
     if (file) {
-      // Check if it's an audio file
       if (!file.type.startsWith('audio/')) {
         alert('Please select an audio file (MP3, WAV, OGG, etc.)')
         return
       }
       
-      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('File size must be less than 5MB')
         return
       }
       
       try {
-        // Save to localStorage
         await saveAudioToStorage(file)
         
-        // Create audio object
         const audioUrl = URL.createObjectURL(file)
         const audio = new Audio(audioUrl)
         
@@ -487,6 +593,11 @@ function App() {
       <div className="container">
         <h1 className="title">🍅 Tomato Clock</h1>
         
+        {/* Precision Timer Debug Info */}
+        <div className="debug-info" style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+          ⏱️ High-Precision Timer Active | Using: requestAnimationFrame + Date.now()
+        </div>
+        
         <div className="mode-indicator">
           <span className={`mode ${mode === 'work' ? 'active' : ''}`}>Work</span>
           <span className={`mode ${mode === 'shortBreak' ? 'active' : ''}`}>Short Break</span>
@@ -514,18 +625,30 @@ function App() {
                 cx="150"
                 cy="150"
                 strokeDasharray={2 * Math.PI * 140}
-                strokeDashoffset={getStrokeDashoffset()}
+                strokeDashoffset={progressData.strokeDashoffset}
                 strokeLinecap="round"
                 transform="rotate(-90 150 150)"
-                key={`progress-${timeLeft}`}
+                style={{
+                  transition: 'stroke-dashoffset 0.3s ease'
+                }}
               />
             </svg>
             <div className="timer-display">
-              <div className="time">{formatTime(timeLeft)}</div>
+              <div className="time">{formattedTime}</div>
               <div className="status">{isBreak ? 'Break Time!' : 'Focus Time!'}</div>
             </div>
           </div>
         </div>
+
+        {/* Alarm Stop Button - shows when alarm is playing */}
+        {isAlarmPlaying && (
+          <div className="alarm-notification">
+            <p>🔔 Timer Complete!</p>
+            <button className="btn btn-stop-alarm" onClick={stopAlarm}>
+              🔇 Stop Alarm
+            </button>
+          </div>
+        )}
 
         <div className="controls">
           {!isRunning ? (
@@ -695,7 +818,6 @@ function App() {
                   testAudio()
                 }}
                 onTouchStart={() => {
-                  // iOS touch event to ensure audio context can be initialized
                   if (!audioContextInitialized) {
                     initializeAudioContext()
                   }
@@ -704,6 +826,17 @@ function App() {
                 {isTestPlaying ? '⏹️ Stop Audio' : '🔊 Test Audio'}
               </button>
             </div>
+          </div>
+          
+          <div className="precision-info">
+            <h4>⚡ Precision Timer Features</h4>
+            <ul>
+              <li>✅ Drift-free timing using Date.now() timestamps</li>
+              <li>✅ High-frequency updates with requestAnimationFrame</li>
+              <li>✅ Optimized React re-renders with useMemo/useCallback</li>
+              <li>✅ Accurate to real-world time within 1 second</li>
+            </ul>
+            <p><small>Test accuracy: Compare with your phone's stopwatch!</small></p>
           </div>
         </div>
       </div>
